@@ -8,7 +8,7 @@
 * Types
   * the core type ``SparseObservable`` is only defined Rust-side
   * ``CTerm`` represents Rust's ``SparseTerm``
-  * Rust's ``Complex64`` is mapped to ``[f64; 2]`` (what is this as C type?)
+  * Rust's ``Complex64`` is mapped to ``double complex`` 
 * Construction
   * ``obs_zero(uint32) -> SparseObservable*``
   * ``obs_add_term(SparseObservable*, CTerm*)``
@@ -32,10 +32,16 @@ Use a custom-defined struct exposed to C, that represents complex numbers, i.e.
 struct c_complex_double([f64; 2]);
 ```
 
+Disadvantage: this is not a native C type and C users will have to use Qiskit's custom type here.
+
 #### Option B
 
 Use ``Complex64`` directly, which is natively C-compatible as it is defined with ``repr(C)``. However, cbindgen doesn't recognize this type 
-so we manually have to update the generated header file to map ``Complex64`` to ``complex double``.
+so we manually have to update the generated header file to map ``Complex64`` to ``double complex``.
+
+Advantage: C users can use their established types.
+
+Disadvantage (but not really): We have to customize cbindgen. @Max will check with the maintainers if the mapping to ``double complex`` can be added.
 
 # Packaging
 
