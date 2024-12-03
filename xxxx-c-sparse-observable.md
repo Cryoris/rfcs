@@ -13,8 +13,8 @@ _Disclaimer: **all** names are up for discussion._
   * Rust's ``Complex64`` is mapped to ``double complex`` 
 * Construction
   * ``obs_zero(uint32) -> SparseObservable*``
+  * ``obs_from_label(char*) -> SparseObservable*``
   * ``obs_add_term(SparseObservable*, CTerm*)``
-  * ``obs_from_label(char*)``
 * Deconstructions
   * ``obs_free(SparseObservable*)``
   * ``obs_term_free(CTerm*)`` 
@@ -52,7 +52,7 @@ struct c_complex_double([f64; 2]);
 
 Disadvantage: this is not a native C type and C users will have to use Qiskit's custom type here.
 
-#### Option B
+#### Option B (current solution)
 
 Use ``Complex64`` directly, which is natively C-compatible as it is defined with ``repr(C)``. However, cbindgen doesn't recognize this type 
 so we manually have to update the generated header file to map ``Complex64`` to ``double complex``.
