@@ -10,7 +10,8 @@ _Disclaimer: **all** names are up for discussion._
 * Types
   * the core type ``SparseObservable`` is only defined Rust-side
   * ``CTerm`` represents Rust's ``SparseTerm``
-  * Rust's ``Complex64`` is mapped to ``double complex`` 
+  * Rust's ``Complex64`` is mapped to ``double complex``
+  * ``BitTerm`` _should_ be natively usable since it is `repr(u8)`
 * Construction
   * ``obs_zero(uint32) -> SparseObservable*``
   * ``obs_from_label(char*) -> SparseObservable*``
