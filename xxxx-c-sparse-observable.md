@@ -5,6 +5,8 @@
 
 # Interface
 
+_Disclaimer: **all** names are up for discussion._
+
 * Types
   * the core type ``SparseObservable`` is only defined Rust-side
   * ``CTerm`` represents Rust's ``SparseTerm``
@@ -13,14 +15,30 @@
   * ``obs_zero(uint32) -> SparseObservable*``
   * ``obs_add_term(SparseObservable*, CTerm*)``
   * ``obs_from_label(char*)``
+* Deconstructions
+  * ``obs_free(SparseObservable*)``
+  * ``obs_term_free(CTerm*)`` 
 * Arithmetic
   * ``obs_add(SparseObservable*, SparseObservable*) -> SparseObservable*``
   * ``obs_mul(SparseObservable*, c_complex_double*) -> SparseObservable*``
   * ``obs_iadd(SparseObservable* self, SparseObservable* other)``
   * ``obs_imul(SparseObservable* self, c_complex_double* value)``
 * Data access
-  * ``obs_terms(SparseObservable*) -> (CTerm*, size)``
-  * (_in discussion_) ``obs_next_term(SparseObservable*, CTerm*) -> CTerm* | null``
+  * ``obs_get_term(SparseObservable*, usize*) -> CTerm*``
+  * ``obs_num_terms(SparseObservable*) -> usize`` 
+
+This allows iterating C-side as 
+```c
+SparseObservable* obs = // your observable ...
+for (int i = 0; i < obs_num_terms(obs); i++) {
+    CTerm* term = obs_get_term(obs, i);
+    // do something with the term
+
+    // free the memory, because Term was constructed ad-hoc
+    // remember that we don't store the SparseObservable as list of Terms!
+    obs_term_free(term);  
+}
+```
  
 ## Complex numbers
 
@@ -42,6 +60,8 @@ so we manually have to update the generated header file to map ``Complex64`` to 
 Advantage: C users can use their established types.
 
 Disadvantage (but not really): We have to customize cbindgen. @Max will check with the maintainers if the mapping to ``double complex`` can be added.
+
+Sharp bit: Complex numbers are not guaranteed to be calling convention compatible and must be passed by pointers, not by values.
 
 # Packaging
 
