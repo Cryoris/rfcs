@@ -69,3 +69,8 @@ Sharp bit: Complex numbers are not guaranteed to be calling convention compatibl
 Options
 1. Users have to compile from source. We provide a Makefile (which might be very short).
 2. We ship the C header and the pre-compiled library for a set of architectures.
+
+# Open questions
+
+* error handling (Current status: `panic!`)
+* serialization: do we have a serialization in Rust we can expose? (Current status: serialization is up to the user)
