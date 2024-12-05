@@ -1,7 +1,7 @@
 # Design considerations
 
-* All memory is owned and administered by Rust.
-* Users operate on the observable only via functions.
+* All memory is owned and administered by Rust. 
+* Users operate on the observable only via functions (there's no struct exposed).
 
 # Interface
 
@@ -63,6 +63,44 @@ Advantage: C users can use their established types.
 Disadvantage (but not really): We have to customize cbindgen. @Max will check with the maintainers if the mapping to ``double complex`` can be added.
 
 Sharp bit: Complex numbers are not guaranteed to be calling convention compatible and must be passed by pointers, not by values.
+
+## Memory handling
+
+We expose functions to C that build an object Rust-side and return a pointer to the memory. This constructor function
+on Rust side is
+
+```rust
+#[no_mangle]  // <-- tell Rust compiler not to mangle the function name, so C can find it
+#[cfg(feature = "cbinding")]  // <-- use cbindgen to generate the C header
+pub extern "C" fn obs_zero(num_qubits: u32) -> mut* SparseObservable {
+    let obs = SparseObservable::zero(num_qubits);  // build object
+    Box::into_raw(Box::new(obs))  // return pointer 
+}
+```
+
+which allows to build the object C side as (the ``SparseObservable`` type is defined as opaque C struct)
+```c
+SparseObservable* obs = obs_zero(10);
+```
+
+Since we're returning a pointer to allocated memory, we also have to ensure the memory is freed. 
+It's the responsibility of the C code to call the corresponding destructor, 
+```c
+obs_free(obs);
+```
+which is implemented Rust-side as 
+```rust
+#[no_mangle]  // <-- tell Rust compiler not to mangle the function name, so C can find it
+#[cfg(feature = "cbinding")]  // <-- use cbindgen to generate the C header
+pub extern "C" fn obs_zero(obs: &mut SparseObservable) {
+    unsafe {  // reading memory from a random pointer is unsafe
+        let _ = Box::from_raw(obs);  // read the memory and let the result go out of scope
+    }
+}
+```
+
+
+
 
 # Packaging
 
