@@ -55,12 +55,17 @@ Disadvantage: this is not a native C type and C users will have to use Qiskit's 
 
 #### Option B (current solution)
 
-Use ``Complex64`` directly, which is natively C-compatible as it is defined with ``repr(C)``. However, cbindgen doesn't recognize this type 
-so we manually have to update the generated header file to map ``Complex64`` to ``double complex``.
+Use ``Complex64`` directly, which is natively C-compatible as it is defined with ``repr(C)``.
+However, cbindgen does not recognize this type by default.
+Thus, we have to configure cbindgen to include a type alias in its ``after_includes`` setting.
+```c
+typedef float complex Complex32;
+typedef double complex Complex64;
+```
 
 Advantage: C users can use their established types.
 
-Disadvantage (but not really): We have to customize cbindgen. @Max will check with the maintainers if the mapping to ``double complex`` can be added.
+Disadvantage (but not really): We have to customize cbindgen.
 
 Sharp bit: Complex numbers are not guaranteed to be calling convention compatible and must be passed by pointers, not by values.
 
