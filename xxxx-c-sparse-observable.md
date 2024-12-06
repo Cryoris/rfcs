@@ -1,7 +1,59 @@
 # Design considerations
 
 * All memory is owned and administered by Rust. 
-* Users operate on the observable only via functions (there's no struct exposed).
+* Users operate on the observable only via functions (the ``SparseObservable`` struct itself is not exposed).
+* Crate management: see discussion below.
+
+# Crate management 
+
+There are multiple options for organizing the Qiskit crates:
+
+#### Clean split
+
+In this scenario, we have a Rust-only (i.e. no C or Python specific code) crate containing the core functionality. Python and C specific code is in separate crates.
+This structure is
+```
+crates/
+  core/  // future objects we expose to C also move here
+    src/
+      sparse_observable.rs  // contains no pyo3, no libc, only Rust
+      ... 
+    Cargo.toml  // no pyo3 or qiskit-accelerate or qiskit-circuit dependencies
+  c_ext/  // C API
+    src/
+      sparse_observable.rs  // function definitions for C
+      lib.rs  // load mods
+    Cargo.toml  // depends on cbinding and qiskit-core
+  pyext/  // Python API
+    src/  // in future, move Python-specific code here
+      lib.rs  // loads mods and expose to Python
+      sparse_observable.rs  // Python interface for SparseObservable
+    Cargo.toml // depends on pyo3 and qiskit-core (and currenty also qiskit-accelerate)
+  accelerate/* // start moving things out of here into core and pyext
+  circuit/* // same; move things
+```
+Advantages:
+* clean split; the core rust functionality is not mixed with Python and PyO3
+* we can build the C library without dependencies on `libpython`
+* we would like this structure in the end anyways?
+
+Disadvantages:
+* more effort?
+
+#### Link `libpython`
+
+Here we keep the Rust core code in the current crates (`accelerate` and `circuit`) and only have to ensure that the objects we use don't call Python.
+To compile, we have to link `libpython`, otherwise not all symbols are defined.
+
+Advantages:
+* possibly less coding effort?
+
+Disadvantages: invert all statments of the "clean split" advantages.
+
+#### Suggestion
+
+We would prefer the "clean split" as it promises to avoid re-engineering what we're building now. 
+However, we might be missing something and this path could maybe be hard to implement for some objects?
 
 # Interface
 
