@@ -2,6 +2,7 @@
 
 * All memory is owned and administered by Rust. 
 * Users operate on the observable only via functions (the ``SparseObservable`` struct itself is not exposed).
+* We generate a single ``"qiskit.h"`` header and link to Rust's compiled binary
 * Crate management: see discussion below.
 
 # Crate management 
@@ -10,8 +11,7 @@ There are multiple options for organizing the Qiskit crates:
 
 #### Clean split
 
-In this scenario, we have a Rust-only (i.e. no C or Python specific code) crate containing the core functionality. Python and C specific code is in separate crates.
-This structure is
+We have 3 seperate crates for Rust, Python, and C, respectively. A Rust-only ``core`` crate contains the data structures and functions in Rust (without PyO3 dependencies), and Python/C specific code is in separate ``py_ext`` and ``c_ext`` crates. This structure could be
 ```
 crates/
   core/  // future objects we expose to C also move here
@@ -38,59 +38,93 @@ Advantages:
 * we would like this structure in the end anyways?
 
 Disadvantages:
-* more effort?
+* more effort to get to, as currently Rust and Python are very entangled
 
-#### Link `libpython`
+#### Minimal split
 
-Here we keep the Rust core code in the current crates (`accelerate` and `circuit`) and only have to ensure that the objects we use don't call Python.
-To compile, we have to link `libpython`, otherwise not all symbols are defined.
+We keep the current ``accelerate`` and ``circuit`` crates and split Python/Rust inplace. The crates/files can still have PyO3 dependencies, as long as the objects we expose to C do not. 
+To compile for C, we link ``libpython`` (otherwise not all symbols are defined).
 
 Advantages:
-* possibly less coding effort?
+* no new crate management
 
-Disadvantages: invert all statments of the "clean split" advantages.
+Disadvantages: `!(Advantages of clean split)`
 
 #### Suggestion
 
 We would prefer the "clean split" as it promises to avoid re-engineering what we're building now. 
+Currently, Rust and Python are very entangled, but we could more things into ``core`` as we split them off from Python (which we want anyways as we expose them to Rust). This might also be easier if in the future we ever want to expose the Rust crate itself.
+
 However, we might be missing something and this path could maybe be hard to implement for some objects?
 
 # Interface
 
 _Disclaimer: **all** names are up for discussion._
 
-* Types
-  * the core type ``SparseObservable`` is only defined Rust-side
-  * ``CTerm`` represents Rust's ``SparseTerm``
-  * Rust's ``Complex64`` is mapped to ``double complex``
-  * ``BitTerm`` _should_ be natively usable since it is `repr(u8)`
-* Construction
-  * ``obs_zero(uint32) -> SparseObservable*``
-  * ``obs_from_label(char*) -> SparseObservable*``
-  * ``obs_add_term(SparseObservable*, CTerm*)``
-* Deconstructions
-  * ``obs_free(SparseObservable*)``
-  * ``obs_term_free(CTerm*)`` 
-* Arithmetic
-  * ``obs_add(SparseObservable*, SparseObservable*) -> SparseObservable*``
-  * ``obs_mul(SparseObservable*, c_complex_double*) -> SparseObservable*``
-  * ``obs_iadd(SparseObservable* self, SparseObservable* other)``
-  * ``obs_imul(SparseObservable* self, c_complex_double* value)``
-* Data access
-  * ``obs_get_term(SparseObservable*, usize*) -> CTerm*``
-  * ``obs_num_terms(SparseObservable*) -> usize`` 
+#### Types
+* ``SparseObservable`` and ``SparseTerm`` are only defined Rust-side
+* C handles only pointers to Rust data
+* Rust's ``Complex64`` is mapped to ``complex double`` and passed as pointer (see dedicated section below)
+* ``BitTerm`` is be natively usable since it is `repr(u8)`
+* Qubit indices/number of qubits is ``uint32_t``
+* Index types are ``uint64_t`` (we use sized to ensure all values have a defined size -- should this be larger?)
+* Any vectors we need are defined Rust-side
+
+#### Construction
+* ``obs_zero(uint32_t) -> SparseObservable*``
+* ``obs_identity(uint32_t) -> SparseObservable*``
+* To push a new term to the observable, we provide a ``copy`` and a ``consume`` variant. The latter
+  frees the memory of the Paulis, given as vector, after adding it to the observable.
+  * ``obs_push_copy(SparseObservable*, PauliTermVec*, complex double*)`` -- copy the Pauli vector
+  * ``obs_push_consume(SparseObservable*, PauliTermVec*, complex double*)`` -- free the Pauli vector after adding it
+      
+Memory de-allocation is the user's responsibility.
+* ``obs_free(SparseObservable*)``
+* ``obsterm_free(SparseTerm*)``
+
+For example:
+```c
+#include "qiskit.h"
+
+SparseObservable *obs = obs_zero(num_qubits);
+
+PauliTermVec *paulis = paulis_new(); // could use paulis_with_capacity(3) here
+paulis_push(paulis, BitTerm_X, 0);  // enums explicitly include their prefix
+paulis_push(paulis, BitTerm_Y, 1);  // (otherwise it would just be a global "X/Y/Z")
+paulis_push(paulis, BitTerm_Z, 2);
+
+complex double coeff = 1;
+obs_push_copy(obs, paulis, &coeff);
+obs_push_consume(obs, paulis, &coeff); // consumes the bits and indices vectors
+
+obs_free(obs);  // once we're done, free the observable (remember, paulis is already freed)
+```
+
+#### Arithmetic
+* ``obs_add(SparseObservable*, SparseObservable*) -> SparseObservable*``
+* ``obs_mul(SparseObservable*, complex double*) -> SparseObservable*``
+* ``obs_iadd(SparseObservable* self, SparseObservable* other)``
+* ``obs_imul(SparseObservable* self, complex double* value)``
+* ... 
+
+#### Data access
+* ``obs_term(SparseObservable*, uint64_t*) -> SparseTerm*``
+* ``obs_num_terms(SparseObservable*) -> uint64_t`` 
+* ``obs_num_qubits(SparseObservable*) -> uint32_t``
+* ...
 
 This allows iterating C-side as 
 ```c
-SparseObservable* obs = // your observable ...
+SparseObservable *obs = // your observable ...
 for (int i = 0; i < obs_num_terms(obs); i++) {
-    CTerm* term = obs_get_term(obs, i);
+    SparseTerm *term = obs_term(obs, i);
     // do something with the term
 
     // free the memory, because Term was constructed ad-hoc
     // remember that we don't store the SparseObservable as list of Terms!
-    obs_term_free(term);  
+    obsterm_free(term);  
 }
+obs_free(obs);
 ```
  
 ## Complex numbers
@@ -137,7 +171,7 @@ pub extern "C" fn obs_zero(num_qubits: u32) -> mut* SparseObservable {
 
 which allows to build the object C side as (the ``SparseObservable`` type is defined as opaque C struct)
 ```c
-SparseObservable* obs = obs_zero(10);
+SparseObservable *obs = obs_zero(10);
 ```
 
 Since we're returning a pointer to allocated memory, we also have to ensure the memory is freed. 
@@ -155,9 +189,6 @@ pub extern "C" fn obs_zero(obs: &mut SparseObservable) {
     }
 }
 ```
-
-
-
 
 # Packaging
 
