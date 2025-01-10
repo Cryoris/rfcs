@@ -5,58 +5,6 @@
 * We generate a single ``"qiskit.h"`` header and link to Rust's compiled binary
 * Crate management: see discussion below.
 
-# Crate management 
-
-There are multiple options for organizing the Qiskit crates:
-
-#### Clean split
-
-We have 3 seperate crates for Rust, Python, and C, respectively. A Rust-only ``core`` crate contains the data structures and functions in Rust (without PyO3 dependencies), and Python/C specific code is in separate ``py_ext`` and ``c_ext`` crates. This structure could be
-```
-crates/
-  core/  // future objects we expose to C also move here
-    src/
-      sparse_observable.rs  // contains no pyo3, no libc, only Rust
-      ... 
-    Cargo.toml  // no pyo3 or qiskit-accelerate or qiskit-circuit dependencies
-  c_ext/  // C API
-    src/
-      sparse_observable.rs  // function definitions for C
-      lib.rs  // load mods
-    Cargo.toml  // depends on cbinding and qiskit-core
-  pyext/  // Python API
-    src/  // in future, move Python-specific code here
-      lib.rs  // loads mods and expose to Python
-      sparse_observable.rs  // Python interface for SparseObservable
-    Cargo.toml // depends on pyo3 and qiskit-core (and currenty also qiskit-accelerate)
-  accelerate/* // start moving things out of here into core and pyext
-  circuit/* // same; move things
-```
-Advantages:
-* clean split; the core rust functionality is not mixed with Python and PyO3
-* we can build the C library without dependencies on `libpython`
-* we would like this structure in the end anyways?
-
-Disadvantages:
-* more effort to get to, as currently Rust and Python are very entangled
-
-#### Minimal split
-
-We keep the current ``accelerate`` and ``circuit`` crates and split Python/Rust inplace. The crates/files can still have PyO3 dependencies, as long as the objects we expose to C do not. 
-To compile for C, we link ``libpython`` (otherwise not all symbols are defined).
-
-Advantages:
-* no new crate management
-
-Disadvantages: `!(Advantages of clean split)`
-
-#### Suggestion
-
-We would prefer the "clean split" as it promises to avoid re-engineering what we're building now. 
-Currently, Rust and Python are very entangled, but we could more things into ``core`` as we split them off from Python (which we want anyways as we expose them to Rust). This might also be easier if in the future we ever want to expose the Rust crate itself.
-
-However, we might be missing something and this path could maybe be hard to implement for some objects?
-
 # Interface
 
 _Disclaimer: **all** names are up for discussion._
@@ -94,7 +42,7 @@ paulis_push(paulis, BitTerm_Y, 1);  // (otherwise it would just be a global "X/Y
 paulis_push(paulis, BitTerm_Z, 2);
 
 complex double coeff = 1;
-obs_push_copy(obs, paulis, &coeff);
+obs_push_copy(obs, paulis, &coeff);  // complex numbers are not calling convention compatible, hence pass by ref
 obs_push_consume(obs, paulis, &coeff); // consumes the bits and indices vectors
 
 obs_free(obs);  // once we're done, free the observable (remember, paulis is already freed)
@@ -189,6 +137,60 @@ pub extern "C" fn obs_zero(obs: &mut SparseObservable) {
     }
 }
 ```
+
+
+# Crate management 
+
+There are multiple options for organizing the Qiskit crates:
+
+#### Clean split
+
+We have 3 seperate crates for Rust, Python, and C, respectively. A Rust-only ``core`` crate contains the data structures and functions in Rust (without PyO3 dependencies), and Python/C specific code is in separate ``py_ext`` and ``c_ext`` crates. This structure could be
+```
+crates/
+  core/  // future objects we expose to C also move here
+    src/
+      sparse_observable.rs  // contains no pyo3, no libc, only Rust
+      ... 
+    Cargo.toml  // no pyo3 or qiskit-accelerate or qiskit-circuit dependencies
+  c_ext/  // C API
+    src/
+      sparse_observable.rs  // function definitions for C
+      lib.rs  // load mods
+    Cargo.toml  // depends on cbinding and qiskit-core
+  pyext/  // Python API
+    src/  // in future, move Python-specific code here
+      lib.rs  // loads mods and expose to Python
+      sparse_observable.rs  // Python interface for SparseObservable
+    Cargo.toml // depends on pyo3 and qiskit-core (and currenty also qiskit-accelerate)
+  accelerate/* // start moving things out of here into core and pyext
+  circuit/* // same; move things
+```
+Advantages:
+* clean split; the core rust functionality is not mixed with Python and PyO3
+* we can build the C library without dependencies on `libpython`
+* we would like this structure in the end anyways?
+
+Disadvantages:
+* more effort to get to, as currently Rust and Python are very entangled
+
+#### Minimal split
+
+We keep the current ``accelerate`` and ``circuit`` crates and split Python/Rust inplace. The crates/files can still have PyO3 dependencies, as long as the objects we expose to C do not. 
+To compile for C, we link ``libpython`` (otherwise not all symbols are defined).
+
+Advantages:
+* no new crate management
+
+Disadvantages: `!(Advantages of clean split)`
+
+#### Suggestion
+
+We would prefer the "clean split" as it promises to avoid re-engineering what we're building now. 
+Currently, Rust and Python are very entangled, but we could more things into ``core`` as we split them off from Python (which we want anyways as we expose them to Rust). This might also be easier if in the future we ever want to expose the Rust crate itself.
+
+However, we might be missing something and this path could maybe be hard to implement for some objects?
+
 
 # Packaging
 
