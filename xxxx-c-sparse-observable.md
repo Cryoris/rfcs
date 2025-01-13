@@ -1,5 +1,7 @@
 # C API for ``SparseObservable``
 
+Goal: Construct, modify, and operator on ``SparseObservable``s from C.
+
 ## Design considerations
 
 * All memory is owned and administered by Rust. 
