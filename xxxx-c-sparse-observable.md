@@ -147,7 +147,7 @@ obs_free(obs);  // once we're done, free the observable (remember, paulis is alr
 * ... 
 
 #### Data access
-* ``obs_term(SparseObservable*, uint64_t*) -> SparseTerm*``
+* ``obs_term(SparseObservable*, uint64_t) -> SparseTerm*``
 * ``obs_num_terms(SparseObservable*) -> uint64_t`` 
 * ``obs_num_qubits(SparseObservable*) -> uint32_t``
 * ...
