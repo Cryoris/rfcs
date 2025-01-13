@@ -1,6 +1,6 @@
 # C API for ``SparseObservable``
 
-Goal: Construct, modify, and operator on ``SparseObservable``s from C.
+Goal: Construct, modify, and operate on ``SparseObservable``s from C.
 
 ## Design considerations
 
