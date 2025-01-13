@@ -38,7 +38,7 @@ obs_free(obs);
 which is implemented Rust-side as 
 ```rust
 #[no_mangle]  // <-- tell Rust compiler not to mangle the function name, so C can find it
-pub extern "C" fn obs_zero(obs: &mut SparseObservable) {
+pub extern "C" fn obs_free(obs: &mut SparseObservable) {
     unsafe {  // reading memory from a random pointer is unsafe
         let _ = Box::from_raw(obs);  // read the memory and let the result go out of scope
     }
