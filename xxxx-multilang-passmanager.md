@@ -771,3 +771,13 @@ impl Pass for PassFromPyTask {
 }
 ```
 This adaptor allows appending a legacy pass from Python.
+
+## Implementation plan
+
+P0: 2.6 critical features
+- [ ] Base Rust pass manager, without Analysis passes or the registry
+- [ ] C pass manager
+- [ ] Expose the new pass to Python 
+
+P1: New features 
+- [ ] Analysis passes and registry
