@@ -485,16 +485,25 @@ We are opting for an opaque struct rather than exposing a `#[repr(C)]` struct to
 the option of modifying the trait without breaking ABI compatibility.
 ```rust
 // note: all of this below is coded in the markdown, it's Rust pseudo-code
+
+/// The pass' run method with signature
+/// void* run(void *self, void *ir, QkPassContext *context);
+type RunFunctionPtr = extern "C" fn(*mut c_void, *mut c_void, *mut PassContext) -> *mut c_void;
+
 struct PassFromC {
-    ptr_run: Box<dyn Fn(c_void, *mut PassContext) -> c_void>,
-    ptr_preserved_analyses: Box<dyn Fn(c_void) -> *const PreservedAnalysis>,
+    ptr_self: *mut c_void,
+    ptr_run: RunFunctionPtr,
+    ptr_preserved_analyses: Box<dyn Fn(*mut c_void) -> *const PreservedAnalysis>,
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn qk_pass_new() -> *mut PassFromC { ... };
 
 #[unsafe(no_mangle)]
-pub extern "C" fn qk_pass_set_run(pass: *mut PassFromC, ptr_run: c_void) { ... };
+pub extern "C" fn qk_pass_set_self(pass: *mut PassFromC, ptr_self: *mut c_void) { ... };
+
+#[unsafe(no_mangle)]
+pub extern "C" fn qk_pass_set_run(pass: *mut PassFromC, ptr_run: RunFunctionPtr) { ... };
 ```
 It's the user's responsibility that the functions are safe to call during the lifetime
 of the pass.
